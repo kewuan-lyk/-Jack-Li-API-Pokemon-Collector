@@ -483,6 +483,10 @@ class PokemonApp {
     this.battleRosterGrid = document.getElementById("battle-roster-grid");
     this.battleArenaStage = document.getElementById("battle-arena-stage");
     this.arenaEnvironment = document.getElementById("arena-environment");
+    this.arenaSceneLabel = document.getElementById("arena-scene-label");
+    this.arenaParticles = document.getElementById("arena-particles");
+    this.arenaFlash = document.getElementById("arena-flash");
+    this.damageLayer = document.getElementById("damage-layer");
     this.oppSprite = document.getElementById("opp-sprite");
     this.oppName = document.getElementById("opp-name");
     this.oppTypeBadge = document.getElementById("opp-type-badge");
@@ -508,6 +512,9 @@ class PokemonApp {
     this.resultDesc = document.getElementById("result-desc");
     this.faintWarningBox = document.getElementById("faint-warning-box");
     this.resultBackBtn = document.getElementById("result-back-btn");
+    // Keep the result layer outside the animated view section so fixed centering
+    // is always relative to the full viewport.
+    document.body.appendChild(this.battleResultModal);
 
     // 详情 Modal 元素
     this.detailModal = document.getElementById("detail-modal");
@@ -745,14 +752,24 @@ class PokemonApp {
         const quotes = [
           `"你好！在 ${poke.floor}楼 的训练师小屋玩得真开心！想看看我的绝招【${move}】吗？"`,
           `"我是 ${typeLabel} 属性的宝可梦！最喜欢在小屋里和你聊天啦。"`,
-          `"今天也是精力充沛的一天！随时准备为你出战！"`
+          `"今天也是精力充沛的一天！随时准备为你出战！"`,
+          `"你收集的图鉴越来越厉害了！下次冒险也带上我吧！"`,
+          `"嘘……我刚刚听见楼下有新的训练师来了。要不要一起去看看？"`,
+          `"训练的时候记得休息，也要给自己和伙伴一点鼓励哦！"`,
+          `"我的绝招【${move}】还在不断变强，等你来挑战！"`,
+          `"这里的气氛真棒！和你一起在小屋里生活，我每天都很开心。"`
         ];
         dialogText = quotes[Math.floor(Math.random() * quotes.length)];
       } else {
         const quotes = [
           `"Hello Trainer! Having fun on ${poke.floor}F! Want to see my move [${move}]?"`,
           `"Pika~ I'm a ${typeLabel}-type Pokémon! I love hanging out in the Lodge."`,
-          `"Feeling full of energy! Ready to battle whenever you choose me!"`
+          `"Feeling full of energy! Ready to battle whenever you choose me!"`,
+          `"Your Pokédex is getting stronger every day. Take me on your next adventure!"`,
+          `"Shh... I heard a new Trainer downstairs. Should we go and say hello?"`,
+          `"Remember to rest between battles, and cheer for your team!"`,
+          `"My move [${move}] is getting stronger. Come back and challenge me again!"`,
+          `"The Lodge feels extra cozy today. I am happy to share it with you!"`
         ];
         dialogText = quotes[Math.floor(Math.random() * quotes.length)];
       }
@@ -1070,7 +1087,7 @@ class PokemonApp {
     this.arenaEnvironment.className = "arena-environment";
 
     const envMap = {
-      water: "env-ocean", ice: "env-ocean",
+      water: "env-ocean", ice: "env-ice",
       fire: "env-volcano",
       electric: "env-electric", steel: "env-electric",
       grass: "env-forest", bug: "env-forest",
@@ -1080,6 +1097,20 @@ class PokemonApp {
     };
 
     this.arenaEnvironment.classList.add(envMap[mainType] || "env-forest");
+
+    const sceneNames = {
+      "env-forest": isZh ? "森林对战场" : "FOREST BATTLEFIELD",
+      "env-sky": isZh ? "天空对战场" : "SKY BATTLEFIELD",
+      "env-ice": isZh ? "冰川对战场" : "GLACIER BATTLEFIELD",
+      "env-ocean": isZh ? "海岸对战场" : "COASTAL BATTLEFIELD",
+      "env-volcano": isZh ? "火山对战场" : "VOLCANIC BATTLEFIELD",
+      "env-cave": isZh ? "岩洞对战场" : "CAVE BATTLEFIELD",
+      "env-electric": isZh ? "雷鸣对战场" : "THUNDER BATTLEFIELD",
+      "env-mystery": isZh ? "幽影对战场" : "SHADOW BATTLEFIELD"
+    };
+    const sceneClass = envMap[mainType] || "env-forest";
+    this.arenaSceneLabel.textContent = sceneNames[sceneClass];
+    this.spawnArenaParticles(mainType);
 
     // 设置名字与属性 Badge
     this.playerName.textContent = isZh ? playerPoke.name : playerPoke.enName;
@@ -1103,6 +1134,88 @@ class PokemonApp {
     // 切换视窗
     this.battleRosterStage.classList.add("hidden");
     this.battleArenaStage.classList.remove("hidden");
+    this.playerSprite.classList.remove("battle-enter", "battle-faint", "battle-hit", "battle-lunge", "battle-guard");
+    this.oppSprite.classList.remove("battle-enter", "battle-faint", "battle-hit", "battle-lunge", "battle-guard");
+    requestAnimationFrame(() => {
+      this.playerSprite.classList.add("battle-enter");
+      this.oppSprite.classList.add("battle-enter");
+    });
+    this.setBattleActionsDisabled(false);
+  }
+
+  setBattleActionsDisabled(disabled) {
+    [this.btnAttack, this.btnSpecial, this.btnDefend, this.btnForfeit].forEach(btn => {
+      if (btn) btn.disabled = disabled;
+    });
+  }
+
+  spawnArenaParticles(type) {
+    if (!this.arenaParticles) return;
+    const palette = type === "ice" ? ["#E0F2FE", "#67E8F9", "#FFFFFF"] : type === "fire" ? ["#F97316", "#FDE047", "#F43F5E"] : type === "electric" ? ["#FDE047", "#FFFFFF", "#A78BFA"] : ["#BBF7D0", "#FDE68A", "#FFFFFF"];
+    this.arenaParticles.innerHTML = "";
+    for (let i = 0; i < 18; i += 1) {
+      const particle = document.createElement("span");
+      particle.className = "arena-particle";
+      particle.style.setProperty("--x", `${Math.random() * 100}%`);
+      particle.style.setProperty("--y", `${25 + Math.random() * 65}%`);
+      particle.style.setProperty("--dx", `${(Math.random() - .5) * 80}px`);
+      particle.style.setProperty("--dy", `${-20 - Math.random() * 70}px`);
+      particle.style.setProperty("--size", `${3 + Math.random() * 7}px`);
+      particle.style.setProperty("--particle-color", palette[i % palette.length]);
+      particle.style.animationDelay = `${Math.random() * 1.8}s`;
+      this.arenaParticles.appendChild(particle);
+    }
+  }
+
+  triggerBattleEffect(attacker, defender, actionType, damage, critical = false) {
+    const attackerSprite = attacker === "player" ? this.playerSprite : this.oppSprite;
+    const defenderSprite = defender === "player" ? this.playerSprite : this.oppSprite;
+    attackerSprite.style.setProperty("--lunge", attacker === "player" ? "30px" : "-30px");
+    attackerSprite.classList.remove("battle-lunge", "battle-guard");
+    defenderSprite.classList.remove("battle-hit");
+    void attackerSprite.offsetWidth;
+    if (actionType === "defend") attackerSprite.classList.add("battle-guard");
+    else attackerSprite.classList.add("battle-lunge");
+    if (damage > 0) {
+      defenderSprite.classList.add("battle-hit");
+      this.arenaEnvironment.classList.remove("battle-shake");
+      this.arenaFlash.classList.remove("active");
+      void this.arenaEnvironment.offsetWidth;
+      this.arenaEnvironment.classList.add("battle-shake");
+      this.arenaFlash.classList.add("active");
+      this.spawnDamageNumber(damage, defenderSprite, critical);
+      this.spawnHitParticles(defenderSprite, critical ? "#FDE047" : "#FFFFFF");
+    }
+  }
+
+  spawnDamageNumber(damage, target, critical) {
+    const arenaRect = this.arenaEnvironment.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    const number = document.createElement("span");
+    number.className = `damage-number ${critical ? "critical" : ""}`;
+    number.textContent = `${critical ? "CRIT! " : "-"}${damage}`;
+    number.style.setProperty("--x", `${((targetRect.left + targetRect.width / 2 - arenaRect.left) / arenaRect.width) * 100}%`);
+    number.style.setProperty("--y", `${((targetRect.top + targetRect.height / 3 - arenaRect.top) / arenaRect.height) * 100}%`);
+    number.style.setProperty("--damage-color", critical ? "#FDE047" : "#FB7185");
+    this.damageLayer.appendChild(number);
+    setTimeout(() => number.remove(), 950);
+  }
+
+  spawnHitParticles(target, color) {
+    const arenaRect = this.arenaEnvironment.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    for (let i = 0; i < 8; i += 1) {
+      const particle = document.createElement("span");
+      particle.className = "arena-particle";
+      particle.style.setProperty("--x", `${((targetRect.left + targetRect.width / 2 - arenaRect.left) / arenaRect.width) * 100}%`);
+      particle.style.setProperty("--y", `${((targetRect.top + targetRect.height / 2 - arenaRect.top) / arenaRect.height) * 100}%`);
+      particle.style.setProperty("--dx", `${(Math.random() - .5) * 130}px`);
+      particle.style.setProperty("--dy", `${(Math.random() - .5) * 100}px`);
+      particle.style.setProperty("--size", `${4 + Math.random() * 6}px`);
+      particle.style.setProperty("--particle-color", color);
+      this.arenaParticles.appendChild(particle);
+      setTimeout(() => particle.remove(), 750);
+    }
   }
 
   updateBattleHP() {
@@ -1121,6 +1234,7 @@ class PokemonApp {
   // 执行战斗回合 (Player Move -> Opponent Counter Attack)
   executeBattleTurn(actionType) {
     if (!this.activeBattle) return;
+    this.setBattleActionsDisabled(true);
     const isZh = this.currentLang === "zh";
     const p = this.activeBattle.player;
     const o = this.activeBattle.opponent;
@@ -1148,7 +1262,10 @@ class PokemonApp {
     if (mult > 1.0) effText = isZh ? "（效果绝佳！🔥）" : " (Super Effective! 🔥)";
     if (mult < 1.0 && mult > 0) effText = isZh ? "（效果不理想……）" : " (Not very effective...)";
 
+    const isCritical = actionType === "special" && Math.random() < 0.25;
+    if (isCritical) pDamage = Math.round(pDamage * 1.35);
     o.hp = Math.max(0, o.hp - pDamage);
+    this.triggerBattleEffect("player", "opponent", actionType, pDamage, isCritical);
     this.updateBattleHP();
 
     const pName = isZh ? p.poke.name : p.poke.enName;
@@ -1170,6 +1287,7 @@ class PokemonApp {
       if (actionType === "defend") oDamage = Math.round(oDamage * 0.4);
 
       p.hp = Math.max(0, p.hp - oDamage);
+      this.triggerBattleEffect("opponent", "player", "attack", oDamage, false);
       this.updateBattleHP();
 
       this.battleLogText.textContent += isZh
@@ -1178,6 +1296,8 @@ class PokemonApp {
 
       if (p.hp <= 0) {
         setTimeout(() => this.endBattle(false, false), 800);
+      } else {
+        this.setBattleActionsDisabled(false);
       }
     }, 900);
   }
@@ -1212,6 +1332,9 @@ class PokemonApp {
     }
 
     this.battleResultModal.classList.remove("hidden");
+    this.setBattleActionsDisabled(true);
+    if (isVictory) this.oppSprite.classList.add("battle-faint");
+    else this.playerSprite.classList.add("battle-faint");
     this.renderLodgeView(); // 重新刷新训练师小屋显示变黑倒计时
   }
 
